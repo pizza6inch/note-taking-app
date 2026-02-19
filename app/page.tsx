@@ -1,13 +1,14 @@
-"use client"
+"use client";
 
-import { AppProvider, useAppStore } from "@/lib/store"
-import { AppHeader } from "@/components/app-header"
-import { NotesDirectory } from "@/components/notes-directory"
-import { NoteEditor } from "@/components/note-editor"
-import { ScheduleModule } from "@/components/schedule-module"
+import { AppProvider, useAppStore } from "@/lib/store";
+import { AppHeader } from "@/components/app-header";
+import { NotesDirectory } from "@/components/notes-directory";
+import { NoteEditor } from "@/components/note-editor";
+import { ScheduleModule } from "@/components/schedule-module";
+import prisma from "@/lib/prisma";
 
 function AppContent() {
-  const { activeModule, currentNoteId } = useAppStore()
+  const { activeModule, currentNoteId } = useAppStore();
 
   return (
     <div className="flex h-screen flex-col bg-background">
@@ -24,7 +25,7 @@ function AppContent() {
         )}
       </main>
     </div>
-  )
+  );
 }
 
 export default function Page() {
@@ -32,5 +33,5 @@ export default function Page() {
     <AppProvider>
       <AppContent />
     </AppProvider>
-  )
+  );
 }
