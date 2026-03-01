@@ -5,6 +5,8 @@ import { AppHeader } from "@/components/app-header";
 import { NotesDirectory } from "@/components/notes-directory";
 import { NoteEditor } from "@/components/note-editor";
 import { ScheduleModule } from "@/components/schedule-module";
+import { SessionProvider } from "next-auth/react";
+
 // import { getPosts } from "@/actions/post-action";
 
 function AppContent() {
@@ -40,10 +42,12 @@ function AppContent() {
   );
 }
 
-export default function Page() {
+export default function Page({ session }: any) {
   return (
+    // <SessionProvider session={session}>
     <AppProvider>
       <AppContent />
     </AppProvider>
+    // </SessionProvider>
   );
 }
