@@ -10,6 +10,10 @@ const handler = NextAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
   ],
+  pages: {
+    signIn: "/",
+    error: "/", // 這樣發生 Callback 或其他錯誤時，會導回 /?error=Callback 而不是 /api/auth/signin
+  },
 });
 
 export { handler as GET, handler as POST };
