@@ -1,209 +1,277 @@
-"use client"
+"use client";
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react"
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+} from "react";
+import { useSession } from "next-auth/react";
+import { toast } from "sonner";
+import {
+  getNotes,
+  createNoteAction,
+  updateNoteAction,
+  deleteNoteAction,
+  getTodos,
+  createTodoAction,
+  toggleTodoAction,
+  deleteTodoAction,
+  getStarred,
+  createStarredAction,
+  deleteStarredAction,
+  getIndexItems,
+  createIndexItemAction,
+  deleteIndexItemAction,
+} from "@/app/actions";
 
 export interface Note {
-  id: string
-  title: string
-  content: string
-  createdAt: Date
-  updatedAt: Date
+  id: string;
+  title: string;
+  content: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface TodoItem {
-  id: string
-  noteId: string
-  text: string
-  completed: boolean
-  createdAt: Date
-  deadline: Date | null
+  id: string;
+  noteId: string;
+  text: string;
+  completed: boolean;
+  createdAt: Date;
+  deadline: Date | null;
 }
 
 export interface StarredItem {
-  id: string
-  noteId: string
-  text: string
-  createdAt: Date
+  id: string;
+  noteId: string;
+  text: string;
+  createdAt: Date;
 }
 
 export interface IndexItem {
-  id: string
-  noteId: string
-  text: string
-  createdAt: Date
+  id: string;
+  noteId: string;
+  text: string;
+  createdAt: Date;
 }
 
 interface AppState {
-  notes: Note[]
-  todos: TodoItem[]
-  starred: StarredItem[]
-  indexItems: IndexItem[]
-  activeModule: "notes" | "schedule"
-  activeScheduleView: "calendar" | "todo" | "starred" | "weekly"
-  currentNoteId: string | null
-  searchQuery: string
+  notes: Note[];
+  todos: TodoItem[];
+  starred: StarredItem[];
+  indexItems: IndexItem[];
+  activeModule: "notes" | "schedule";
+  activeScheduleView: "calendar" | "todo" | "starred" | "weekly";
+  currentNoteId: string | null;
+  searchQuery: string;
 }
 
 interface AppContextType extends AppState {
-  setActiveModule: (module: "notes" | "schedule") => void
-  setActiveScheduleView: (view: "calendar" | "todo" | "starred" | "weekly") => void
-  setCurrentNoteId: (id: string | null) => void
-  setSearchQuery: (query: string) => void
-  createNote: () => Note
-  updateNote: (id: string, updates: Partial<Pick<Note, "title" | "content">>) => void
-  deleteNote: (id: string) => void
-  addTodo: (noteId: string, text: string, deadline?: Date | null) => void
-  toggleTodo: (id: string) => void
-  deleteTodo: (id: string) => void
-  addStarred: (noteId: string, text: string) => void
-  deleteStarred: (id: string) => void
-  addIndexItem: (noteId: string, text: string) => void
-  deleteIndexItem: (id: string) => void
-  getNoteById: (id: string) => Note | undefined
+  setActiveModule: (module: "notes" | "schedule") => void;
+  setActiveScheduleView: (
+    view: "calendar" | "todo" | "starred" | "weekly",
+  ) => void;
+  setCurrentNoteId: (id: string | null) => void;
+  setSearchQuery: (query: string) => void;
+  createNote: () => Promise<Note | undefined>;
+  updateNote: (
+    id: string,
+    updates: Partial<Pick<Note, "title" | "content">>,
+  ) => Promise<void>;
+  deleteNote: (id: string) => Promise<void>;
+  addTodo: (
+    noteId: string,
+    text: string,
+    deadline?: Date | null,
+  ) => Promise<void>;
+  toggleTodo: (id: string) => Promise<void>;
+  deleteTodo: (id: string) => Promise<void>;
+  addStarred: (noteId: string, text: string) => Promise<void>;
+  deleteStarred: (id: string) => Promise<void>;
+  addIndexItem: (noteId: string, text: string) => Promise<void>;
+  deleteIndexItem: (id: string) => Promise<void>;
+  getNoteById: (id: string) => Note | undefined;
 }
 
-const AppContext = createContext<AppContextType | null>(null)
-
-function generateId(): string {
-  return Math.random().toString(36).substring(2) + Date.now().toString(36)
-}
-
-const sampleNotes: Note[] = [
-  {
-    id: "note-1",
-    title: "Getting Started with Notecraft",
-    content: "# Welcome to Notecraft\n\nThis is your first note. You can edit it, add todos, and star important content.\n\n## Features\n\n- Rich text editing\n- Table of contents\n- Todo management\n- Starred items\n\n## Getting Started\n\nClick on any note to open the editor. Use the context menu to add items to your todo list or starred collection.",
-    createdAt: new Date(Date.now() - 86400000 * 5),
-    updatedAt: new Date(Date.now() - 86400000 * 2),
-  },
-  {
-    id: "note-2",
-    title: "Project Planning",
-    content: "# Project Planning\n\n## Goals\n\nDefine project milestones and deliverables.\n\n## Timeline\n\nWeek 1: Research and discovery\nWeek 2: Design and prototyping\nWeek 3: Development sprint\nWeek 4: Testing and deployment",
-    createdAt: new Date(Date.now() - 86400000 * 3),
-    updatedAt: new Date(Date.now() - 86400000 * 1),
-  },
-  {
-    id: "note-3",
-    title: "Meeting Notes - Feb 2026",
-    content: "# Meeting Notes\n\n## Attendees\n\nTeam leads, product manager, design team\n\n## Agenda\n\n1. Sprint review\n2. Backlog grooming\n3. Resource allocation\n\n## Action Items\n\n- Update documentation\n- Prepare demo for stakeholders\n- Review pull requests",
-    createdAt: new Date(Date.now() - 86400000 * 2),
-    updatedAt: new Date(Date.now() - 86400000 * 0.5),
-  },
-  {
-    id: "note-4",
-    title: "Design System Guidelines",
-    content: "# Design System\n\n## Typography\n\nUse Inter for body text and headings.\n\n## Colors\n\nPrimary: Zinc/Slate palette\nAccent: Subtle blue highlights\n\n## Components\n\nButtons, Cards, Inputs, Dialogs follow a consistent pattern.",
-    createdAt: new Date(Date.now() - 86400000 * 1),
-    updatedAt: new Date(Date.now() - 3600000),
-  },
-]
-
-const sampleTodos: TodoItem[] = [
-  { id: "todo-1", noteId: "note-3", text: "Update documentation", completed: false, createdAt: new Date(Date.now() - 86400000 * 2), deadline: new Date(Date.now() + 86400000 * 3) },
-  { id: "todo-2", noteId: "note-3", text: "Prepare demo for stakeholders", completed: false, createdAt: new Date(Date.now() - 86400000 * 2), deadline: new Date(Date.now() + 86400000 * 5) },
-  { id: "todo-3", noteId: "note-3", text: "Review pull requests", completed: true, createdAt: new Date(Date.now() - 86400000 * 2), deadline: null },
-  { id: "todo-4", noteId: "note-2", text: "Complete project research", completed: false, createdAt: new Date(Date.now() - 86400000 * 3), deadline: new Date(Date.now() + 86400000 * 1) },
-]
-
-const sampleStarred: StarredItem[] = [
-  { id: "star-1", noteId: "note-1", text: "Rich text editing", createdAt: new Date(Date.now() - 86400000 * 4) },
-  { id: "star-2", noteId: "note-4", text: "Primary: Zinc/Slate palette", createdAt: new Date(Date.now() - 86400000 * 1) },
-]
+const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [notes, setNotes] = useState<Note[]>(sampleNotes)
-  const [todos, setTodos] = useState<TodoItem[]>(sampleTodos)
-  const [starred, setStarred] = useState<StarredItem[]>(sampleStarred)
-  const [indexItems, setIndexItems] = useState<IndexItem[]>([])
-  const [activeModule, setActiveModule] = useState<"notes" | "schedule">("notes")
-  const [activeScheduleView, setActiveScheduleView] = useState<"calendar" | "todo" | "starred" | "weekly">("calendar")
-  const [currentNoteId, setCurrentNoteId] = useState<string | null>(null)
-  const [searchQuery, setSearchQuery] = useState("")
+  const { status } = useSession();
 
-  const createNote = useCallback(() => {
-    const newNote: Note = {
-      id: generateId(),
-      title: "Untitled",
-      content: "",
-      createdAt: new Date(),
-      updatedAt: new Date(),
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [starred, setStarred] = useState<StarredItem[]>([]);
+  const [indexItems, setIndexItems] = useState<IndexItem[]>([]);
+  const [activeModule, setActiveModule] = useState<"notes" | "schedule">(
+    "notes",
+  );
+  const [activeScheduleView, setActiveScheduleView] = useState<
+    "calendar" | "todo" | "starred" | "weekly"
+  >("calendar");
+  const [currentNoteId, setCurrentNoteId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // 1. 初始資料載入 (監聽登入狀態)
+  useEffect(() => {
+    if (status === "authenticated") {
+      loadData();
+    } else if (status === "unauthenticated") {
+      // 登出時清空資料
+      setNotes([]);
+      setTodos([]);
+      setStarred([]);
+      setIndexItems([]);
+      setCurrentNoteId(null);
     }
-    setNotes((prev) => [newNote, ...prev])
-    return newNote
-  }, [])
+  }, [status]);
 
-  const updateNote = useCallback((id: string, updates: Partial<Pick<Note, "title" | "content">>) => {
-    setNotes((prev) =>
-      prev.map((note) =>
-        note.id === id ? { ...note, ...updates, updatedAt: new Date() } : note
-      )
-    )
-  }, [])
+  const loadData = async () => {
+    try {
+      // 平行發送所有請求以加速載入
+      const [notesRes, todosRes, starredRes, indexRes] = await Promise.all([
+        getNotes(),
+        getTodos(),
+        getStarred(),
+        getIndexItems(),
+      ]);
 
-  const deleteNote = useCallback((id: string) => {
-    setNotes((prev) => prev.filter((note) => note.id !== id))
-    setTodos((prev) => prev.filter((t) => t.noteId !== id))
-    setStarred((prev) => prev.filter((s) => s.noteId !== id))
-    setIndexItems((prev) => prev.filter((i) => i.noteId !== id))
-  }, [])
-
-  const addTodo = useCallback((noteId: string, text: string, deadline?: Date | null) => {
-    const newTodo: TodoItem = {
-      id: generateId(),
-      noteId,
-      text,
-      completed: false,
-      createdAt: new Date(),
-      deadline: deadline || null,
+      if (notesRes.success && notesRes.data) setNotes(notesRes.data);
+      if (todosRes.success && todosRes.data) setTodos(todosRes.data);
+      if (starredRes.success && starredRes.data) setStarred(starredRes.data);
+      if (indexRes.success && indexRes.data) setIndexItems(indexRes.data);
+    } catch (error) {
+      toast.error("載入資料失敗");
     }
-    setTodos((prev) => [...prev, newTodo])
-  }, [])
+  };
 
-  const toggleTodo = useCallback((id: string) => {
-    setTodos((prev) =>
-      prev.map((todo) =>
-        todo.id === id ? { ...todo, completed: !todo.completed } : todo
-      )
-    )
-  }, [])
+  // =====================================
+  // 2. CRUD 動作 (串接 Server Actions)
+  // =====================================
 
-  const deleteTodo = useCallback((id: string) => {
-    setTodos((prev) => prev.filter((todo) => todo.id !== id))
-  }, [])
-
-  const addStarred = useCallback((noteId: string, text: string) => {
-    const newStarred: StarredItem = {
-      id: generateId(),
-      noteId,
-      text,
-      createdAt: new Date(),
+  const createNote = useCallback(async () => {
+    const res = await createNoteAction();
+    if (res.success && res.data) {
+      setNotes((prev) => [res.data, ...prev]);
+      return res.data;
+    } else {
+      toast.error(res.error || "新增筆記失敗");
     }
-    setStarred((prev) => [...prev, newStarred])
-  }, [])
+  }, []);
 
-  const deleteStarred = useCallback((id: string) => {
-    setStarred((prev) => prev.filter((s) => s.id !== id))
-  }, [])
+  const updateNote = useCallback(
+    async (id: string, updates: Partial<Pick<Note, "title" | "content">>) => {
+      // 【樂觀更新】：直接先改前端畫面，讓打字不會卡頓，背景再慢慢存資料庫
+      setNotes((prev) =>
+        prev.map((note) =>
+          note.id === id
+            ? { ...note, ...updates, updatedAt: new Date() }
+            : note,
+        ),
+      );
+      const res = await updateNoteAction(id, updates);
+      if (!res.success) {
+        toast.error(res.error || "自動存檔失敗，請檢查網路");
+      }
+    },
+    [],
+  );
 
-  const addIndexItem = useCallback((noteId: string, text: string) => {
-    const newIndex: IndexItem = {
-      id: generateId(),
-      noteId,
-      text,
-      createdAt: new Date(),
+  const deleteNote = useCallback(
+    async (id: string) => {
+      // 【樂觀更新】：瞬間從畫面移除
+      setNotes((prev) => prev.filter((note) => note.id !== id));
+      setTodos((prev) => prev.filter((t) => t.noteId !== id));
+      setStarred((prev) => prev.filter((s) => s.noteId !== id));
+      setIndexItems((prev) => prev.filter((i) => i.noteId !== id));
+      if (currentNoteId === id) setCurrentNoteId(null); // 如果正在編輯該筆記，把它關掉
+
+      const res = await deleteNoteAction(id);
+      if (!res.success) toast.error(res.error || "刪除筆記失敗");
+    },
+    [currentNoteId],
+  );
+
+  const addTodo = useCallback(
+    async (noteId: string, text: string, deadline?: Date | null) => {
+      const res = await createTodoAction(noteId, text, deadline);
+      if (res.success && res.data) {
+        setTodos((prev) => [...prev, res.data]);
+        toast.success("已加入待辦清單");
+      } else {
+        toast.error(res.error || "新增待辦失敗");
+      }
+    },
+    [],
+  );
+
+  const toggleTodo = useCallback(async (id: string) => {
+    let currentStatus = false;
+
+    // 【樂觀更新】：先瞬間切換勾選狀態
+    setTodos((prev) => {
+      const todo = prev.find((t) => t.id === id);
+      if (todo) currentStatus = todo.completed;
+      return prev.map((todo) =>
+        todo.id === id ? { ...todo, completed: !todo.completed } : todo,
+      );
+    });
+
+    const res = await toggleTodoAction(id, !currentStatus);
+    if (!res.success) {
+      toast.error(res.error || "更新待辦狀態失敗");
+      // 失敗的話退回原本的狀態
+      setTodos((prev) =>
+        prev.map((todo) =>
+          todo.id === id ? { ...todo, completed: currentStatus } : todo,
+        ),
+      );
     }
-    setIndexItems((prev) => [...prev, newIndex])
-  }, [])
+  }, []);
 
-  const deleteIndexItem = useCallback((id: string) => {
-    setIndexItems((prev) => prev.filter((i) => i.id !== id))
-  }, [])
+  const deleteTodo = useCallback(async (id: string) => {
+    setTodos((prev) => prev.filter((todo) => todo.id !== id));
+    const res = await deleteTodoAction(id);
+    if (!res.success) toast.error(res.error || "刪除待辦失敗");
+  }, []);
+
+  const addStarred = useCallback(async (noteId: string, text: string) => {
+    const res = await createStarredAction(noteId, text);
+    if (res.success && res.data) {
+      setStarred((prev) => [...prev, res.data]);
+      toast.success("已加入星號標記");
+    } else {
+      toast.error(res.error || "新增星號失敗");
+    }
+  }, []);
+
+  const deleteStarred = useCallback(async (id: string) => {
+    setStarred((prev) => prev.filter((s) => s.id !== id));
+    const res = await deleteStarredAction(id);
+    if (!res.success) toast.error(res.error || "刪除星號失敗");
+  }, []);
+
+  const addIndexItem = useCallback(async (noteId: string, text: string) => {
+    const res = await createIndexItemAction(noteId, text);
+    if (res.success && res.data) {
+      setIndexItems((prev) => [...prev, res.data]);
+      toast.success("已加入目錄索引");
+    } else {
+      toast.error(res.error || "新增目錄失敗");
+    }
+  }, []);
+
+  const deleteIndexItem = useCallback(async (id: string) => {
+    setIndexItems((prev) => prev.filter((i) => i.id !== id));
+    const res = await deleteIndexItemAction(id);
+    if (!res.success) toast.error(res.error || "刪除目錄失敗");
+  }, []);
 
   const getNoteById = useCallback(
     (id: string) => notes.find((n) => n.id === id),
-    [notes]
-  )
+    [notes],
+  );
 
   return (
     <AppContext.Provider
@@ -235,11 +303,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     >
       {children}
     </AppContext.Provider>
-  )
+  );
 }
 
 export function useAppStore() {
-  const ctx = useContext(AppContext)
-  if (!ctx) throw new Error("useAppStore must be used within AppProvider")
-  return ctx
+  const ctx = useContext(AppContext);
+  if (!ctx) throw new Error("useAppStore must be used within AppProvider");
+  return ctx;
 }

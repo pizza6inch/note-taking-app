@@ -45,9 +45,10 @@ export function NotesDirectory() {
     currentPage * ITEMS_PER_PAGE,
   );
 
-  function handleNew() {
-    const note = createNote();
-    setCurrentNoteId(note.id);
+  async function handleNew() {
+    const note = await createNote();
+    // 等資料庫建立好並回傳了，才幫使用者跳轉到那篇筆記
+    if (note) setCurrentNoteId(note.id);
   }
 
   return (
