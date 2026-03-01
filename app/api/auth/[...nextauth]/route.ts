@@ -6,6 +6,7 @@ import prisma from "@/lib/prisma";
 // 1. 將設定抽離出來，並 export
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
