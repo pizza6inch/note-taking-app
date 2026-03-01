@@ -112,7 +112,7 @@ export function NotesDirectory() {
         ) : (
           // 實際渲染筆記清單
           paginated.map((note) => (
-            <button
+            <div
               key={note.id}
               onClick={() => setCurrentNoteId(note.id)}
               className="group flex w-full items-start justify-between gap-4 rounded-lg border border-border bg-card p-4 text-left transition-all hover:border-ring/30 hover:shadow-sm"
@@ -140,7 +140,7 @@ export function NotesDirectory() {
               >
                 <Trash2 className="size-4" />
               </button>
-            </button>
+            </div>
           ))
         )}
       </div>

@@ -66,6 +66,7 @@ interface AppState {
   activeScheduleView: "calendar" | "todo" | "starred" | "weekly";
   currentNoteId: string | null;
   searchQuery: string;
+  isLoading: boolean;
 }
 
 interface AppContextType extends AppState {
@@ -112,24 +113,28 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   >("calendar");
   const [currentNoteId, setCurrentNoteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   // 1. 初始資料載入 (監聽登入狀態)
   useEffect(() => {
     if (status === "authenticated") {
       loadData();
     } else if (status === "unauthenticated") {
-      // 登出時清空資料
+      // 登出時清空資料並解除 loading
       setNotes([]);
       setTodos([]);
       setStarred([]);
       setIndexItems([]);
       setCurrentNoteId(null);
+      setIsLoading(false); // 確定未登入，不用 loading
+    } else if (status === "loading") {
+      setIsLoading(true); // Session 還在檢查中，保持 loading
     }
   }, [status]);
 
   const loadData = async () => {
+    setIsLoading(true); // 開始載入
     try {
-      // 平行發送所有請求以加速載入
       const [notesRes, todosRes, starredRes, indexRes] = await Promise.all([
         getNotes(),
         getTodos(),
@@ -143,6 +148,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (indexRes.success && indexRes.data) setIndexItems(indexRes.data);
     } catch (error) {
       toast.error("載入資料失敗");
+    } finally {
+      setIsLoading(false); // 載入結束 (不論成功失敗)
     }
   };
 
@@ -284,6 +291,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         activeScheduleView,
         currentNoteId,
         searchQuery,
+        isLoading,
         setActiveModule,
         setActiveScheduleView,
         setCurrentNoteId,
