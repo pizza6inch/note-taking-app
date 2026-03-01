@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton"; // 引入骨架元件
 import {
   Pagination,
   PaginationContent,
@@ -17,8 +18,14 @@ import { formatDistanceToNow } from "date-fns";
 const ITEMS_PER_PAGE = 6;
 
 export function NotesDirectory() {
-  const { notes, createNote, deleteNote, setCurrentNoteId, searchQuery } =
-    useAppStore();
+  const {
+    notes,
+    createNote,
+    deleteNote,
+    setCurrentNoteId,
+    searchQuery,
+    isLoading,
+  } = useAppStore();
   const [page, setPage] = useState(1);
 
   const filteredNotes = useMemo(() => {
@@ -47,7 +54,6 @@ export function NotesDirectory() {
 
   async function handleNew() {
     const note = await createNote();
-    // 等資料庫建立好並回傳了，才幫使用者跳轉到那篇筆記
     if (note) setCurrentNoteId(note.id);
   }
 
@@ -59,11 +65,19 @@ export function NotesDirectory() {
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Notes
           </h1>
-          <p className="text-sm text-muted-foreground">
-            {sorted.length} {sorted.length === 1 ? "note" : "notes"}
-          </p>
+          {/* 載入中不顯示數量 */}
+          {!isLoading && (
+            <p className="text-sm text-muted-foreground">
+              {sorted.length} {sorted.length === 1 ? "note" : "notes"}
+            </p>
+          )}
         </div>
-        <Button onClick={handleNew} size="sm" className="gap-2">
+        <Button
+          onClick={handleNew}
+          size="sm"
+          className="gap-2"
+          disabled={isLoading}
+        >
           <Plus className="size-4" />
           New Note
         </Button>
@@ -71,7 +85,23 @@ export function NotesDirectory() {
 
       {/* Notes List */}
       <div className="flex-1 space-y-2">
-        {paginated.length === 0 ? (
+        {isLoading ? (
+          // 載入狀態：顯示 4 個骨架卡片
+          Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex w-full items-start justify-between gap-4 rounded-lg border border-border bg-card p-4"
+            >
+              <div className="min-w-0 flex-1 space-y-3">
+                <Skeleton className="h-5 w-1/3" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-4/5" />
+                <Skeleton className="mt-2 h-3 w-24" />
+              </div>
+            </div>
+          ))
+        ) : paginated.length === 0 ? (
+          // 搜尋不到或無資料的狀態
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <p className="text-sm text-muted-foreground">
               {searchQuery
@@ -80,8 +110,9 @@ export function NotesDirectory() {
             </p>
           </div>
         ) : (
+          // 實際渲染筆記清單
           paginated.map((note) => (
-            <div
+            <button
               key={note.id}
               onClick={() => setCurrentNoteId(note.id)}
               className="group flex w-full items-start justify-between gap-4 rounded-lg border border-border bg-card p-4 text-left transition-all hover:border-ring/30 hover:shadow-sm"
@@ -109,13 +140,13 @@ export function NotesDirectory() {
               >
                 <Trash2 className="size-4" />
               </button>
-            </div>
+            </button>
           ))
         )}
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
+      {!isLoading && totalPages > 1 && (
         <Pagination className="mt-6">
           <PaginationContent>
             <PaginationItem>
